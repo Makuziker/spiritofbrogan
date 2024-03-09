@@ -1,0 +1,44 @@
+{
+  "url": "https://spiritofbrogan.com",
+  "admin": {
+    "url": "https://spiritofbrogan.com"
+  },
+  "server": {
+    "port": 2368,
+    "host": "0.0.0.0"
+  },
+  "mail": {
+    "transport": "SMTP",
+    "options": {
+      "service": "Google",
+      "host": "smtp.gmail.com",
+      "port": 465,
+      "secure": true,
+      "auth": {
+        "user": "user@server.com",
+        "pass": "passsword"
+      }
+    }
+  },
+  "logging": {
+    "transports": [
+      "stdout"
+    ]
+  },
+  "database": {
+    "client": "mysql",
+    "connection": 
+    {
+      "host": "service-mysql-ghost-k8s",
+      "user": "mysql-db-user",
+      "password": "Xu7IJbN5ykuGhdakNPPfYU",
+      "database": "mysql-db-name",
+      "port": "3306"
+    }
+  },
+  "debug": true,
+  "process": "local",
+  "paths": {
+    "contentPath": "/var/lib/ghost/content"
+  }
+}
