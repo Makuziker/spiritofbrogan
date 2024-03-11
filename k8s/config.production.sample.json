@@ -31,7 +31,7 @@
     {
       "host": "service-mysql-ghost-k8s",
       "user": "mysql-db-user",
-      "password": "Xu7IJbN5ykuGhdakNPPfYU",
+      "password": "passsword",
       "database": "mysql-db-name",
       "port": "3306"
     }

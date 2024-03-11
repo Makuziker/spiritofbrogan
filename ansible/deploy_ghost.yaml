@@ -1,0 +1,28 @@
+- name: Deploy Ghost K8s application
+  hosts: microk8s
+  tasks:
+    - name: copy k8s directory to remote
+      copy:
+        src: ../k8s
+        dest: /home/devops_user/
+
+    - name: Set k8s owner and group
+      become: true
+      file:
+        path: /home/devops_user/k8s
+        state: directory
+        owner: devops_user
+        group: microk8s
+        recurse: true
+
+    # Note: updates to existing configuration might require `microk8s kubectl delete -f example.yaml`
+    - name: Apply k8s configuration
+      shell: "microk8s kubectl apply -f /home/devops_user/k8s/{{ item }}"
+      loop:
+        - 00*
+        - 01*
+        - 03*
+        - 04*
+        - 05*
+        - 06*
+        - 07*

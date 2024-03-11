@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/version: "5.6"
     app.kubernetes.io/component: frontend
     app.kubernetes.io/part-of: ghost-k8s
-
 spec:
   ports:
   - port: 2368

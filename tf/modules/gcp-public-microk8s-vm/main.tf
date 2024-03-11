@@ -26,9 +26,11 @@ resource "google_compute_instance" "this" {
 
   network_interface {
     network = "default"
-  }
 
-  # access_config {}
+    access_config {
+      network_tier = "STANDARD"
+    }
+  }
 
   metadata = {
     ssh-keys = "${var.vm_ssh_user}:${file("${var.vm_ssh_key_path}")}"
@@ -37,15 +39,28 @@ resource "google_compute_instance" "this" {
   tags = [var.vm_name]
 }
 
-resource "google_compute_firewall" "this" {
-  name    = "ssh-firewall"
+resource "google_compute_firewall" "https" {
+  name    = "firewall-microk8s-https"
   network = "default"
 
   allow {
     protocol = "tcp"
-    ports    = ["22", "443", "16443"]
+    ports    = ["443"]
   }
 
   source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["${var.vm_name}"]
+}
+
+resource "google_compute_firewall" "admin" {
+  name    = "firewall-microk8s-admin"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22", "16443"]
+  }
+
+  source_ranges = var.admin_source_ranges
   target_tags   = ["${var.vm_name}"]
 }

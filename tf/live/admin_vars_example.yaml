@@ -1,0 +1,3 @@
+# Replace this with IP addresses to whitelist for VM admin access.
+source_ranges:
+  - "0.0.0.0"

@@ -113,3 +113,12 @@ ghost-local.db
 **/**/*local*
 .monokle
 .monokle
+
+# Terraform/Terragrunt
+**/.terragrunt-cache/
+*.tfstate*
+tf/live/admin_vars.yaml
+
+# K8s secret files
+**/04-config.production.yaml
+**/01-secrets.yaml

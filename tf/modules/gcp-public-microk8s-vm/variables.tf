@@ -39,6 +39,7 @@ variable "vm_ssh_key_path" {
   type = string
 }
 
-# variable "ssh_source_ranges" {
-#   type = list(string)
-# }
+variable "admin_source_ranges" {
+  description = "List of IPs to allow SSH and kubectl API access from."
+  type        = list(string)
+}
