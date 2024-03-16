@@ -95,6 +95,32 @@ ssh -i keys/devops_user.pem devops_user@<vm_public_ip>
 ```
 Access website Ghost console at https://example.com/ghost. Create your admin user. Download and enable a theme for the main site to become available.
 
+# Setup Kubeconfig (basic)
+
+We can 
+
+Copy `/var/snap/microk8s/current/credentials/client.config` from remote to `spiritofbrogan/.kube/config` (or the default `~/.kube/config`). This is a microk8s generated kubeconfig for localhost access. We will need an SSH tunnel to use it.
+
+```
+# Set the custom path to kubeconfig
+# export KUBECONFIG=$(pwd)/.kube/config
+# Check that the microk8s-cluster context is selected
+# microk8s kubectl config get-contexts
+# SSH localhost port forwarding tunnel.
+ssh -L localhost:16443:localhost:16443 devops_user@35.212.182.22 -i keys/devops_user.pem
+# Check connectivity
+microk8s kubectl get pod --kubeconfig=$(pwd)/.kube/config -n ghost-k8s
+```
+
+## Todos
+
+- Test resizing PVs.
+- Show dashboard locally for remote cluster.
+- Add Vault service to K8s cluster with ConfigMap.
+  - Vault contains the secrets (DB credentials), ConfigMap can manually or automatically source from Vault. Check out plugins for connecting them.
+- Look into Golang custom K8s libraries. How they define K8s modules (via `api: `) that we can call and instantiate.
+- Sidecar pattern on application pod for logging and metrics collection.
+
 ## Credits
 
 Thanks and gratitude to these creators and references that I have sourced code from:
