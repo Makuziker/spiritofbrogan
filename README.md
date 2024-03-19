@@ -112,9 +112,46 @@ ssh -L localhost:16443:localhost:16443 devops_user@35.212.182.22 -i keys/devops_
 microk8s kubectl get pod --kubeconfig=$(pwd)/.kube/config -n ghost-k8s
 ```
 
+# Resize an existing microk8s-hostpath Persistent Volume
+
+Say that the ghost static storage is getting full. The commands below demonstrate how to resize the existing static storage PV without data loss. Adjust the `pv` accordingly, the new storage in `GiB`, and edit/remove `--kubeconfig` to your setup.
+
+```
+microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # Get PV ID
+
+microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}' --kubeconfig=.kube/config
+
+microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # Check RECLAIM POLICY is Retain
+
+microk8s kubectl delete -f k8s/06-ghost-deployment.yaml -n ghost-k8s --kubeconfig=.kube/config
+
+microk8s kubectl delete pvc ghost-k8s-static-ghost -n ghost-k8s --kubeconfig=.kube/config
+
+microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # check STATUS is Released
+
+microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"capacity":{"storage":"11Gi"}}}' -n ghost-k8s --kubeconfig=.kube/config
+
+microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # check CAPACITY is 11GiB
+
+microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"claimRef": null}}' -n ghost-k8s --kubeconfig=.kube/config
+
+microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # check STATUS is available
+
+# Edit 02-pvc.yaml static-storage PVC. `storage` to match with the PV. `volumeName` to match the pv ID.
+
+microk8s kubectl apply -f k8s/02-pvc.yaml  -n ghost-k8s --kubeconfig=.kube/config
+
+microk8s kubectl get pvc -n ghost-k8s --kubeconfig=.kube/config
+
+microk8s kubectl apply -f k8s/06-ghost-deployment.yaml -n ghost-k8s --kubeconfig=.kube/config
+
+microk8s kubectl get pod -n ghost-k8s --kubeconfig=.kube/config
+
+# Verify that the pvc is mounted, with the right size, and the site comes back online.
+```
+
 ## Todos
 
-- Test resizing PVs.
 - Show dashboard locally for remote cluster.
 - Add Vault service to K8s cluster with ConfigMap.
   - Vault contains the secrets (DB credentials), ConfigMap can manually or automatically source from Vault. Check out plugins for connecting them.

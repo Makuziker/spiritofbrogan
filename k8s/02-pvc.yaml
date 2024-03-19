@@ -15,9 +15,10 @@ spec:
   volumeMode: Filesystem
   accessModes:
   - ReadWriteOnce
+  volumeName: pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 # Added to existing cluster pv/pvc maintenance.
   resources:
     requests:
-      storage: 5Gi
+      storage: 11Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
