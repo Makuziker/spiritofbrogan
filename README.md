@@ -97,9 +97,12 @@ Access website Ghost console at https://example.com/ghost. Create your admin use
 
 # Setup Kubeconfig (basic)
 
-We can 
-
-Copy `/var/snap/microk8s/current/credentials/client.config` from remote to `spiritofbrogan/.kube/config` (or the default `~/.kube/config`). This is a microk8s generated kubeconfig for localhost access. We will need an SSH tunnel to use it.
+We can use the default microk8s config like so:
+- SSH to Ubuntu machine
+- Run `microk8s config -l` to generate the default kubeconfig for loopback access.
+- Merge this config output with your local `~/.kube/config` file, or `spiritofbrogan/.kube/config`.
+- Set the current-context if necessary.
+- Setup SSH port forwarding so that your 127.0.0.1:16443 maps to the remote 127.0.0.1:16443.
 
 ```
 # Set the custom path to kubeconfig
@@ -109,43 +112,45 @@ Copy `/var/snap/microk8s/current/credentials/client.config` from remote to `spir
 # SSH localhost port forwarding tunnel.
 ssh -L localhost:16443:localhost:16443 devops_user@35.212.182.22 -i keys/devops_user.pem
 # Check connectivity
-microk8s kubectl get pod --kubeconfig=$(pwd)/.kube/config -n ghost-k8s
+microk8s kubectl get pod -n ghost-k8s
+# or
+kubectl get pod -n ghost-k8s
 ```
 
 # Resize an existing microk8s-hostpath Persistent Volume
 
-Say that the ghost static storage is getting full. The commands below demonstrate how to resize the existing static storage PV without data loss. Adjust the `pv` accordingly, the new storage in `GiB`, and edit/remove `--kubeconfig` to your setup.
+Say that the ghost static storage is getting full. The commands below demonstrate how to resize the existing static storage PV without data loss. Adjust the `pv` accordingly, and the new storage in `GiB`.
 
 ```
-microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # Get PV ID
+microk8s kubectl get pv -n ghost-k8s # Get PV ID
 
-microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}' --kubeconfig=.kube/config
+microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
 
-microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # Check RECLAIM POLICY is Retain
+microk8s kubectl get pv -n ghost-k8s # Check RECLAIM POLICY is Retain
 
-microk8s kubectl delete -f k8s/06-ghost-deployment.yaml -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl delete -f k8s/06-ghost-deployment.yaml -n ghost-k8s
 
-microk8s kubectl delete pvc ghost-k8s-static-ghost -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl delete pvc ghost-k8s-static-ghost -n ghost-k8s
 
-microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # check STATUS is Released
+microk8s kubectl get pv -n ghost-k8s # check STATUS is Released
 
-microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"capacity":{"storage":"11Gi"}}}' -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"capacity":{"storage":"11Gi"}}}' -n ghost-k8s
 
-microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # check CAPACITY is 11GiB
+microk8s kubectl get pv -n ghost-k8s # check CAPACITY is 11GiB
 
-microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"claimRef": null}}' -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl patch pv pvc-7aa7e7b5-be0c-4231-a900-68913ccf7f34 -p '{"spec":{"claimRef": null}}' -n ghost-k8s 
 
-microk8s kubectl get pv -n ghost-k8s --kubeconfig=.kube/config # check STATUS is available
+microk8s kubectl get pv -n ghost-k8s # check STATUS is available
 
 # Edit 02-pvc.yaml static-storage PVC. `storage` to match with the PV. `volumeName` to match the pv ID.
 
-microk8s kubectl apply -f k8s/02-pvc.yaml  -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl apply -f k8s/02-pvc.yaml  -n ghost-k8s
 
-microk8s kubectl get pvc -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl get pvc -n ghost-k8s
 
-microk8s kubectl apply -f k8s/06-ghost-deployment.yaml -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl apply -f k8s/06-ghost-deployment.yaml -n ghost-k8s
 
-microk8s kubectl get pod -n ghost-k8s --kubeconfig=.kube/config
+microk8s kubectl get pod -n ghost-k8s
 
 # Verify that the pvc is mounted, with the right size, and the site comes back online.
 ```

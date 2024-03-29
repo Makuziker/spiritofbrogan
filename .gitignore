@@ -90,6 +90,7 @@ Temporary Items
 **/**/**/*.local
 backups-ghost/**
 persistence/**
+ghost.log
 
 node_modules/
 **/node_modules/
