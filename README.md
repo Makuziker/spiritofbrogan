@@ -38,6 +38,7 @@ ansible --version
 brew install ubuntu/microk8s/microk8s
 microk8s install
 microk8s status --wait-ready
+# You may want to `microk8s disable ha-cluster` with a single-node installation
 microk8s enable dns cert-manager dashboard dns registry istio ingress hostpath-storage
 ```
 
