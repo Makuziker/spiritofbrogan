@@ -59,35 +59,20 @@ spec:
         - name: ghk3s
           containerPort: 2368
           protocol: TCP
-
-        # readinessProbe:
-        #   initialDelaySeconds: 30
-        #   periodSeconds: 10
-        #   timeoutSeconds: 3
-        #   successThreshold: 1
-        #   failureThreshold: 6
-        #   httpGet:
-        #     path: /ghost/api/v4/admin/site/
-        #     port: ghk3s
-        #     httpHeaders:
-        #     - name: X-Forwarded-Proto
-        #       value: https
-        #     - name: Host
-        #       value: tests.yourdomain.com
-        # livenessProbe:
-        #   httpGet:
-        #     path: /ghost/api/v4/admin/site/
-        #     port: ghk3s
-        #     httpHeaders:
-        #     - name: X-Forwarded-Proto
-        #       value: https
-        #     - name: Host
-        #       value: tests.yourdomain.com
-        #   periodSeconds: 3600
-        #   timeoutSeconds: 3
-        #   successThreshold: 1
-        #   failureThreshold: 1
-        #   initialDelaySeconds: 60
+        livenessProbe:
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 2
+          httpGet:
+            path: /ghost/api/v4/admin/site/
+            port: ghk3s
+            httpHeaders:
+              - name: X-Forwarded-Proto
+                value: https
+              - name: Host
+                value: spiritofbrogan.com
 
         env:
         - name: NODE_ENV
