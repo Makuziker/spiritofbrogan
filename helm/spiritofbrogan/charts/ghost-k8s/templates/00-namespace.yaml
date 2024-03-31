@@ -1,0 +1,8 @@
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "ghost-k8s.name" . }}
+  labels:
+    {{- include "ghost-k8s.labels" . | nindent 4 }}
+spec: {}

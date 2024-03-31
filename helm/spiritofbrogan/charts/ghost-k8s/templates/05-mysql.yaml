@@ -1,34 +1,25 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: mysql-ghost-k8s
-  namespace: ghost-k8s
+  name: mysql-{{ include "ghost-k8s.name" . }}
+  namespace: {{ include "ghost-k8s.name" . }}
   labels:
-    app: mysql-ghost-k8s
-    app.kubernetes.io/name: mysql-ghost-k8s
-    app.kubernetes.io/instance: ghost-k8s
-    app.kubernetes.io/version: "5.6"
-    app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: ghost-k8s
+    {{- include "ghost-k8s.labels" . | nindent 4 }}
 spec:
-  serviceName: service-mysql-ghost-k8s
+  serviceName: service-mysql-{{ include "ghost-k8s.name" . }}
   replicas: 1
   selector:
     matchLabels:
-      app: mysql-ghost-k8s
+      app: mysql-{{ include "ghost-k8s.name" . }}
   template:
     metadata:
       labels:
-        app: mysql-ghost-k8s
-        app.kubernetes.io/name: mysql-ghost-k8s
-        app.kubernetes.io/instance: ghost-k8s
-        app.kubernetes.io/version: "5.6"
-        app.kubernetes.io/component: database
+        {{- include "ghost-k8s.name" . | nindent 8 }}
       annotations:
         container.apparmor.security.beta.kubernetes.io/mysql-ghost-k8s: runtime/default
     spec:
       initContainers:
-      - name: mysql-ghost-k8s-init
+      - name: mysql-{{ include "ghost-k8s.name" . }}-init
         securityContext:
           allowPrivilegeEscalation: false
           privileged: false
@@ -38,13 +29,13 @@ spec:
         imagePullPolicy: Always
         command: ['sh', '-c', 'chown -R 999:999 /mnt/mysql || true'] 
         volumeMounts:
-        - name: mysql-ghost-k8s-volume
+        - name: mysql-{{ include "ghost-k8s.name" . }}-volume
           mountPath: /mnt/mysql
           subPath: mysql-empty-dir
 
 
       containers:
-      - name: mysql-ghost-k8s
+      - name: mysql-{{ include "ghost-k8s.name" . }}
         securityContext:
           allowPrivilegeEscalation: false
           privileged: false
@@ -53,7 +44,7 @@ spec:
         imagePullPolicy: Always
         envFrom:
         - secretRef:
-            name: mysql-ghost-k8s
+            name: mysql-{{ include "ghost-k8s.name" . }}
         resources:
           requests:
             memory: 100Mi
@@ -66,7 +57,7 @@ spec:
           protocol: TCP
           name: mysqlgh
         volumeMounts:
-        - name: mysql-ghost-k8s-volume
+        - name: mysql-{{ include "ghost-k8s.name" . }}-volume
           mountPath: /var/lib/mysql
           subPath: mysql-empty-dir
       automountServiceAccountToken: false
@@ -74,6 +65,6 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       volumes:
-      - name: mysql-ghost-k8s-volume
+      - name: mysql-{{ include "ghost-k8s.name" . }}-volume
         persistentVolumeClaim:
-          claimName: mysql-ghost-k8s
+          claimName: mysql-{{ include "ghost-k8s.name" . }}

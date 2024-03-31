@@ -156,6 +156,55 @@ microk8s kubectl get pod -n ghost-k8s
 # Verify that the pvc is mounted, with the right size, and the site comes back online.
 ```
 
+## Import existing K8s resources into a Helm chart
+
+Create a basic Helm chart, with a subchart for ghost-k8s.
+
+We can see that Helm does not manage these resources when it is lacking the Labels and Annotations:
+
+```sh
+kubectl describe secret mysql-ghost-k8s -n ghost-k8s
+Name:         mysql-ghost-k8s
+Namespace:    ghost-k8s
+Labels:       <none>
+Annotations:  <none>
+# ...
+```
+
+Run the below commands to add Helm metadata to existing resources.
+
+```sh
+# Kudos to https://jacky-jiang.medium.com/import-existing-resources-in-helm-3-e27db11fd467 for the bulk labelling script.
+NAMESPACE=ghost-k8s
+RELEASE_NAME="<your_release_name>" # Was chart-1711855390
+KINDS=secret,pv,pvc,svc,statefulset,deploy,ing
+
+kubectl label namespace/$NAMESPACE app.kubernetes.io/managed-by=Helm
+kubectl annotate --overwrite namespace/$NAMESPACE meta.helm.sh/release-name=$RELEASE_NAME
+kubectl annotate namespace/$NAMESPACE meta.helm.sh/release-namespace=$NAMESPACE
+
+kubectl get -n $NAMESPACE $KINDS -o name | xargs -I % kubectl label -n $NAMESPACE % app.kubernetes.io/managed-by=Helm
+kubectl get -n $NAMESPACE $KINDS -o name | xargs -I % kubectl annotate --overwrite -n $NAMESPACE % meta.helm.sh/release-name=$RELEASE_NAME
+kubectl get -n $NAMESPACE $KINDS -o name | xargs -I % kubectl annotate -n $NAMESPACE % meta.helm.sh/release-namespace=$NAMESPACE
+
+# Now our K8s resources have the Helm Labels and Annotations:
+kubectl get deploy -o name -n $NAMESPACE | xargs -I % kubectl describe % -n $NAMESPACE
+# Name:               ghost-k8s
+# Namespace:          ghost-k8s
+# CreationTimestamp:  Mon, 18 Mar 2024 18:39:44 -0600
+# Labels:             app.kubernetes.io/managed-by=Helm
+# Annotations:        deployment.kubernetes.io/revision: 2
+#                     meta.helm.sh/release-name: chart-1711855390
+#                     meta.helm.sh/release-namespace: ghost-k8s
+# ...
+
+# If you do not provide --namespace, Helm may target whatever is assigned to `$HELM_NAMESPACE`, which is most likely "default".
+
+# Install the Helm chart
+helm install --dry-run=server $RELEASE_NAME --namespace $NAMESPACE .
+helm install $RELEASE_NAME --namespace $NAMESPACE .
+```
+
 ## Todos
 
 - Show dashboard locally for remote cluster.
