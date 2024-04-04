@@ -75,7 +75,7 @@ ls -l keys
   - k8s/01-secrets.yaml
   - k8s/04-config.production.yaml
 
-## Launch
+## Launch and Install
 
 Provision the infrastructure with Terragrunt. Configure and deploy the K8s Ghost application with Ansible.
 
@@ -89,12 +89,10 @@ terragrunt run-all apply
 cd ../../.. # back to project root dir.
 ansible-playbook ansible/health_check.yaml
 ansible-playbook ansible/install_microk8s.yaml
-ansible-playbook ansible/deploy_ghost.yaml
 
 # SSH to remote VM
 ssh -i keys/devops_user.pem devops_user@<vm_public_ip>
 ```
-Access website Ghost console at https://example.com/ghost. Create your admin user. Download and enable a theme for the main site to become available.
 
 # Setup Kubeconfig (basic)
 
@@ -117,6 +115,10 @@ microk8s kubectl get pod -n ghost-k8s
 # or
 kubectl get pod -n ghost-k8s
 ```
+
+# Ghost site
+
+Access website Ghost console at https://mydomain.com/ghost. Create your admin user. Download and enable a theme for the main site to become available.
 
 # Resize an existing microk8s-hostpath Persistent Volume
 
