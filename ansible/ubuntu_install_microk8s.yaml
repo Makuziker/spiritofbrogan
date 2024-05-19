@@ -1,0 +1,174 @@
+---
+- name: Install MicroK8s
+  hosts: hostbrr_devops
+  vars:
+    admin_user: devops_user
+  tasks:
+    - name: Create microk8s common directory if not present
+      become: true
+      file:
+        path: /var/snap/microk8s/common
+        state: directory
+
+    - name: Copy microk8s launch configuration
+      become: true
+      copy:
+        src: "{{ playbook_dir }}/files/microk8s/lc.yaml"
+        dest: /var/snap/microk8s/common/.microk8s.yaml
+
+    # This task tends to fail intermittently during the playbook, thus the retries.
+    - name: Install microk8s snap package
+      become: true
+      command: snap install microk8s --classic
+      register: microk8s_install
+      until: microk8s_install is succeeded
+      retries: 5
+      delay: 5
+
+    - name: Add admin user to microk8s group
+      become: true
+      user:
+        name: "{{ admin_user }}"
+        groups: microk8s
+        append: yes
+
+    - name: Reset connection
+      become: true
+      meta: reset_connection
+
+    - name: Stop microk8s
+      command: microk8s stop
+
+    - name: Set .kube folder for admin user
+      become: true
+      file:
+        path: "/home/{{ admin_user }}/.kube"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        state: directory
+
+    - name: Add alias for microk8s kubectl command
+      become: true
+      lineinfile:
+        path: "/home/{{ admin_user }}/.bash_aliases"
+        line: "alias kubectl='microk8s kubectl'"
+        create: yes
+
+    - name: Disable calico_backend vxlan
+      become: true
+      lineinfile:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^  calico_backend: "vxlan"'
+        state: absent
+
+    - name: Enable calico_backend bird
+      become: true
+      lineinfile:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^  # calico_backend: "bird"'
+        line: '  calico_backend: "bird"'
+
+    - name: Set CNI IP to none
+      become: true
+      replace:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^(            - name: IP\n              value: "autodetect")'
+        replace: '            - name: IP\n              value: "none"'
+
+    - name: Set IPv4 VXLAN to Never
+      become: true
+      replace:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^(            - name: CALICO_IPV4POOL_VXLAN\n              value: "Always")'
+        replace: '            - name: CALICO_IPV4POOL_VXLAN\n              value: "Never"'
+
+    - name: Set IPv6 VXLAN to Never
+      become: true
+      replace:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^(            - name: CALICO_IPV6POOL_VXLAN\n              value: "Always")'
+        replace: '            - name: CALICO_IPV6POOL_VXLAN\n              value: "Never"'
+
+    - name: Set IPv4 autodetection method to none
+      become: true
+      replace:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^(            - name: IP_AUTODETECTION_METHOD\n              value: "first-found")'
+        replace: '            - name: IP_AUTODETECTION_METHOD\n              value: "none"'
+
+    - name: Set IPv6 autodetection to interface=ens3
+      become: true
+      replace:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^(            - name: IP6_AUTODETECTION_METHOD\n              value: "first-found")'
+        replace: '            - name: IP6_AUTODETECTION_METHOD\n              value: "interface=ens3"'
+
+    # '"ipam": {' only occurs once in the cni.yaml file
+    - name: Add assign_ipv4 false
+      become: true
+      lineinfile:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        insertafter: '"ipam": {'
+        line: '              "assign_ipv4": "false",'
+
+    # This cni.yaml comment is typically right above FELIX_IPV6SUPPORT
+    - name: Add IPv6 NAT outgoing
+      become: true
+      replace:
+        path: /var/snap/microk8s/current/args/cni-network/cni.yaml
+        regexp: '^(            # Disable IPv6 on Kubernetes.)'
+        replace: '            - name: CALICO_IPV6POOL_NAT_OUTGOING\n              value: "true"'
+
+    - name: Start microk8s
+      command: microk8s start
+
+    - name: Enable microk8s common modules
+      command: microk8s enable {{ item }}
+      loop:
+        - dns
+        - ingress
+        - hostpath-storage
+        - cert-manager # Sometimes cert-manager hangs waiting to become ready.
+      register: microk8s_enable_result
+      until: microk8s_enable_result is succeeded
+      retries: 5
+      delay: 2
+      async: 70
+      poll: 0
+
+    - name: Check microk8s status
+      block:
+        - name: Check microk8s status
+          command: microk8s status
+          register: microk8s_status
+
+        - name: Print microk8s status
+          debug:
+            var: microk8s_status.stdout_lines
+
+        - name: Fail if microk8s is not running
+          fail:
+            msg: "MicroK8s is not running"
+          when: "'microk8s is running' not in microk8s_status.stdout_lines"
+      rescue:
+        - name: Retry microk8s start
+          command: microk8s start
+
+        - name: Print microk8s retried status
+          command: microk8s status
+          register: microk8s_retried_status
+
+        - name: Fail if microk8s is not running after retry
+          fail:
+            msg: "MicroK8s is not running after retry"
+          when: "'microk8s is running' not in microk8s_retried_status.stdout_lines"
+
+    - name: Copy kubeconfig file to local workspace
+      fetch:
+        src: /var/snap/microk8s/current/credentials/client.config
+        dest: "{{ playbook_dir }}/../.kube/microk8s.yaml"
+        flat: yes
+
+    - name: Prompt user to edit kubeconfig file
+      debug:
+        msg: "Edit the kubeconfig file at {{ playbook_dir }}/../.kube/microk8s.yaml to replace the server address with the public IPv6 address of the VPS: [{{ ansible_default_ipv6.address }}]. Then, configure your KUBECONFIG path to point to this file."

@@ -1,0 +1,71 @@
+---
+# Hostbrr initializes the VPS with root SSH access.
+# Create a separate admin user with sudo access, so that we can disable root login.
+- name: Create Admin User
+  hosts: hostbrr_devops
+  vars:
+    admin_user: devops_user
+    ansible_user: root
+    ansible_ssh_private_key_file: keys/hostbrr_sob_root.pem
+  tasks:
+    - name: Set public key string
+      delegate_to: localhost # Read the file from the workspace, not the remote host.
+      set_fact:
+        ssh_pubkey: "{{ lookup('ansible.builtin.file', '../keys/devops_user_pkcs8.pub') }}"
+
+    - name: Debug ssh_pubkey
+      debug:
+        var: ssh_pubkey
+
+    - name: Create user
+      block:
+        - name: Add new user to sudo group
+          ansible.builtin.user:
+            append: true
+            name: "{{ admin_user }}"
+            groups: "sudo"
+            password: "*"
+            shell: /bin/bash
+      rescue:
+        - name: Add new user to wheel group
+          ansible.builtin.user:
+            append: true
+            name: "{{ admin_user }}"
+            groups: "wheel"
+            password: "*"
+            shell: /bin/bash
+
+    - name: Add public key to authorized_keys
+      ansible.posix.authorized_key:
+        key: "{{ ssh_pubkey }}"
+        user: "{{ admin_user }}"
+
+    - name: Allow admin_user passwordless sudo
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ admin_user }}"
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          {{ admin_user }} ALL=(ALL) NOPASSWD:ALL
+
+    # Ubuntu has to resolve its own hostname during sudo
+    - name: Add hostname to /etc/hosts so that sudo works
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ item }}"
+        insertbefore: BOF
+      loop:
+        - "::1 {{ inventory_hostname }}"
+        - "127.0.0.1 {{ inventory_hostname }}"
+
+    - name: Check sudo access
+      become: true
+      become_user: "{{ admin_user }}"
+      ansible.builtin.command: sudo id -u
+      register: id_output
+      changed_when: false
+      
+    - name: Verify sudo access
+      assert:
+        that: id_output.stdout == '0'

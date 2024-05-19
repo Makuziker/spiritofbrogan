@@ -1,0 +1,14 @@
+---
+- name: Disable root login
+  hosts: hostbrr_devops
+  vars:
+    admin_user: devops_user
+  tasks:
+    - name: Assert that the current user is the non-root admin user
+      assert:
+        that: ansible_user_id == admin_user
+    - name: Change the root shell to nologin
+      become: true
+      ansible.builtin.user:
+        name: root
+        shell: /usr/sbin/nologin

@@ -1,0 +1,92 @@
+---
+- name: Configure IPv6 VPS for Ubuntu
+  hosts: hostbrr_devops
+  vars:
+    nameservers:
+      - "nameserver 2a00:1098:2b::1"
+      - "nameserver 2a00:1098:2c::1"
+      - "nameserver 2a01:4f8:c2c:123f::1"
+  tasks:
+    - name: Print ansible_distribution
+      debug:
+        var: ansible_distribution
+
+    - name: Ensure ansible_distribution is Ubuntu
+      assert:
+        that:
+          - ansible_distribution == 'Ubuntu'
+
+    - name: Install basic APT packages
+      become: true
+      apt:
+        name:
+          - resolvconf # to manage /etc/resolv.conf
+          - nettools
+        state: present
+        update_cache: yes
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 5
+      delay: 10
+
+    - name: Ensure resolvconf service is enabled and running
+      become: true
+      ansible.builtin.service:
+        name: resolvconf
+        state: started
+        enabled: yes
+
+    - name: Ensure /etc/resolvconf/resolv.conf.d exists
+      become: true
+      file:
+        path: /etc/resolvconf/resolv.conf.d
+        state: directory
+
+    - name: Ensure /etc/resolvconf/resolv.conf.d/head exists
+      become: true
+      file:
+        path: /etc/resolvconf/resolv.conf.d/head
+        state: touch
+
+    - name: Add IPv6 nameservers to /etc/resolvconf/resolv.conf.d/head
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/resolvconf/resolv.conf.d/head
+        line: "{{ item }}"
+        insertbefore: BOF
+      loop: "{{ nameservers }}"
+
+    - name: Regenerate resolv.conf
+      become: true
+      ansible.builtin.command:
+        cmd: resolvconf -u
+
+    - name: Restart resolvconf service
+      become: true
+      ansible.builtin.service:
+        name: resolvconf
+        state: restarted
+
+    - name: Send request to IPv4 address
+      uri:
+        url: https://github.com
+        method: GET
+      register: ipv4_response
+      until: ipv4_response.status == 200
+      retries: 5
+      delay: 5
+
+    - name: Setup sysctl parameters for IPv6
+      become: true
+      ansible.builtin.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        # net.bridge.bridge-nf-call-ip6tables seems enabled during microk8s install
+        - { name: 'net.ipv6.conf.all.forwarding', value: 1 }
+      register: sysctl_result
+      until: sysctl_result is succeeded
+      retries: 5
+      delay: 2

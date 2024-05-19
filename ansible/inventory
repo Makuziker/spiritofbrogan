@@ -1,2 +1,2 @@
-[microk8s]
-vm_01 ansible_host=35.212.182.22 ansible_user=devops_user ansible_ssh_private_key_file=keys/devops_user.pem
+[hostbrr_devops]
+spiritofbrogan-k8s-001 ansible_host=2a01:4f8:162:1904::a ansible_user=devops_user ansible_ssh_private_key_file=keys/devops_user.pem

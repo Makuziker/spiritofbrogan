@@ -123,3 +123,12 @@ tf/live/admin_vars.yaml
 # K8s secret files
 helm/spiritofbrogan/values.yaml
 **/04-config.production.yaml
+
+# Microk8s inspect dump
+**/inspection*
+**/inspection*/**
+
+# Log files
+*.log
+**/log
+**/logs

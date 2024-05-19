@@ -19,4 +19,4 @@ spec:
           service:
             name: service-{{ include "ghost-k8s.name" . }}
             port:
-              name: ghk3s
+              name: ghk8s

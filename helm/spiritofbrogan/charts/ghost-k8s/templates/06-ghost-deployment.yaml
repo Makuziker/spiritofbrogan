@@ -10,27 +10,17 @@ spec:
   selector:
     matchLabels: # copied from original manifests
       app: {{ include "ghost-k8s.name" . }}
-      app.kubernetes.io/name: {{ include "ghost-k8s.name" . }}
-      app.kubernetes.io/instance: {{ include "ghost-k8s.name" . }}
-      app.kubernetes.io/version: "5.6"
-      app.kubernetes.io/component: frontend
-      app.kubernetes.io/part-of: {{ include "ghost-k8s.name" . }}
-
   template:
     metadata:
       namespace: {{ include "ghost-k8s.name" . }}
       labels: # copied from original manifests
         app: {{ include "ghost-k8s.name" . }}
-        app.kubernetes.io/name: {{ include "ghost-k8s.name" . }}
-        app.kubernetes.io/instance: {{ include "ghost-k8s.name" . }}
-        app.kubernetes.io/version: "5.6"
-        app.kubernetes.io/component: frontend
-        app.kubernetes.io/part-of: {{ include "ghost-k8s.name" . }}
     spec:
+      automountServiceAccountToken: false
       volumes:
-      - name: {{ include "ghost-k8s.name" . }}-static-ghost
+      - name: k8s-ghost-content
         persistentVolumeClaim:
-          claimName: {{ include "ghost-k8s.name" . }}-static-ghost
+          claimName: k8s-ghost-content
 
       - name: ghost-config-prod
         secret:
@@ -42,23 +32,67 @@ spec:
           sizeLimit: 64Mi
 
       initContainers:
-      - name: {{ include "ghost-k8s.name" . }}-init
+      - name: ghost-k8s-init
         image: docker.io/busybox:stable-musl
+        env:
+        - name: GHOST_INSTALL
+          value: /var/lib/ghost
+        - name: GHOST_CONTENT
+          value: /var/lib/ghost/content
+        - name: NODE_ENV
+          value: production
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        resources:
+          limits:
+            cpu: 900m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
         command:
-        - /bin/sh
-        - -c
-        - chown -Rf 1000:1000 /var/lib/ghost/content || true
+          - /bin/sh
+          - '-c'
+          - |
+            set -e
+
+            # Check if the following directories exists under $GHOST_CONTENT directory, if not, create them and then change the ownership to 1000:1000
+            export DIRS="files logs apps themes data public settings images media"
+            for dir in $DIRS; do
+              if [ ! -d $GHOST_CONTENT/$dir ]; then
+                echo "Creating $GHOST_CONTENT/$dir directory"
+                mkdir -pv $GHOST_CONTENT/$dir && chown -Rf 1000:1000 $GHOST_CONTENT/$dir || echo "Error creating $GHOST_CONTENT/$dir directory" && true
+              fi
+            done
+
+
+            echo 'Delete and clean $GHOST_CONTENT/public directory and recreate it'
+            rm -rfv $GHOST_CONTENT/public && mkdir -pv $GHOST_CONTENT/public || echo 'Error deleting and cleaning $GHOST_CONTENT/public directory and recreating it' && true
+
+            echo 'Check if the directory $GHOST_CONTENT/themes ownership is different from UID 1000 and GID 1000, if so, change it to 1000:1000 recursively and verbose.'
+            if [ "$(stat -c '%u:%g' $GHOST_CONTENT/themes)" != "1000:1000" ]; then
+              echo 'Changing ownership of $GHOST_CONTENT/themes directory to 1000:1000'
+              chown -Rf 1000:1000 $GHOST_CONTENT/themes || echo 'Error changing ownership of $GHOST_CONTENT/themes directory to 1000:1000' && true
+            fi
+
+            echo 'Check if the directory $GHOST_CONTENT/public ownership is different from UID 1000 and GID 1000, if so, change it to 1000:1000 recursively and verbose.'
+            if [ "$(stat -c '%u:%g' $GHOST_CONTENT/public)" != "1000:1000" ]; then
+              echo 'Changing ownership of $GHOST_CONTENT/public directory to 1000:1000'
+              chown -Rf 1000:1000 $GHOST_CONTENT/public || echo 'Error changing ownership of $GHOST_CONTENT/public directory to 1000:1000' && true
+            fi
 
         volumeMounts:
-        - name: {{ include "ghost-k8s.name" . }}-static-ghost
+        - name: k8s-ghost-content
           mountPath: /var/lib/ghost/content
-
+          readOnly: false
 
       containers:
       - name: {{ include "ghost-k8s.name" . }}
         image: ghcr.io/sredevopsorg/ghost-on-kubernetes:main
+        imagePullPolicy: Always
         ports:
-        - name: ghk3s
+        - name: ghk8s
           containerPort: 2368
           protocol: TCP
         livenessProbe:
@@ -69,7 +103,7 @@ spec:
           failureThreshold: 2
           httpGet:
             path: /ghost/api/v4/admin/site/
-            port: ghk3s
+            port: ghk8s
             httpHeaders:
               - name: X-Forwarded-Proto
                 value: https
@@ -79,16 +113,18 @@ spec:
         env:
         - name: NODE_ENV
           value: production
+        - name: TZ
+          value: America/Edmonton # todo: refactor
         resources:
           limits:
-            cpu: 1000m
-            memory: 1Gi
+            cpu: 800m
+            memory: 800Mi
           requests:
             cpu: 100m
-            memory: 100Mi
+            memory: 200Mi
 
         volumeMounts:
-        - name: {{ include "ghost-k8s.name" . }}-static-ghost
+        - name: k8s-ghost-content
           mountPath: /var/lib/ghost/content
         - name: ghost-config-prod
           readOnly: true
@@ -97,7 +133,6 @@ spec:
         - name: tmp # This is the temporary volume mount to allow loading themes
           mountPath: /tmp
           readOnly: false
-        imagePullPolicy: Always
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
@@ -110,7 +145,9 @@ spec:
       securityContext: {}
       schedulerName: default-scheduler
   strategy:
-    type: Recreate
-  revisionHistoryLimit: 1
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 3
+  revisionHistoryLimit: 3
   progressDeadlineSeconds: 600
-

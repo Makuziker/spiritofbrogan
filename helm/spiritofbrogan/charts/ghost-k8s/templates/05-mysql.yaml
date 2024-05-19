@@ -14,9 +14,8 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "ghost-k8s.name" . | nindent 8 }}
-      annotations:
-        container.apparmor.security.beta.kubernetes.io/mysql-ghost-k8s: runtime/default
+        app: mysql-{{ include "ghost-k8s.name" . }}
+        {{- include "ghost-k8s.labels" . | nindent 8 }}
     spec:
       initContainers:
       - name: mysql-{{ include "ghost-k8s.name" . }}-init
@@ -32,8 +31,6 @@ spec:
         - name: mysql-{{ include "ghost-k8s.name" . }}-volume
           mountPath: /mnt/mysql
           subPath: mysql-empty-dir
-
-
       containers:
       - name: mysql-{{ include "ghost-k8s.name" . }}
         securityContext:

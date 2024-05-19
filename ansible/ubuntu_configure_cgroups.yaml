@@ -1,0 +1,24 @@
+---
+- name: Configure cgroups
+  hosts: hostbrr_devops
+  tasks:
+    - name: Ensure ansible_distribution is Ubuntu
+      assert:
+        that:
+          - ansible_distribution == 'Ubuntu'
+
+    - name: Replace GRUB_CMDLINE_LINUX so that cgroups work
+      become: true
+      replace:
+        path: /etc/default/grub
+        regexp: 'GRUB_CMDLINE_LINUX="(.*)"'
+        replace: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory cgroup_memory=1 systemd.unified_cgroup_hierarchy=0"'
+        backup: yes
+
+    - name: Update GRUB
+      become: true
+      command: update-grub
+
+    - name: Reboot
+      become: true
+      reboot:
