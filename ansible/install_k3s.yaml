@@ -1,0 +1,56 @@
+---
+- name: Install k3s Server Node
+  hosts: hostbrr_devops
+  vars:
+    flannel_backend: vxlan
+    # flannel_ipv6_masq: true
+    # These CIDRs are for IPv6 single stack, they do not overlap.
+    cluster_cidr: 2001:cafe:42::/56 # ~4.7 sextillion addresses for pods
+    service_cidr: 2001:cafe:43::/112 # 65,536 addresses for services
+    # node_name: rancher.spiritofbrogan.com
+  tasks:
+    - name: Print facts and variables
+      debug:
+        msg: 
+          ansible_default_ipv6.address: "{{ ansible_default_ipv6.address }}"
+          cluster_cidr: "{{ cluster_cidr }}"
+          service_cidr: "{{ service_cidr }}"
+          flannel_backend: "{{ flannel_backend }}"
+          # node_name: "{{ node_name }}"
+      
+    - name: Install k3s if not installed
+      block:
+        - name: Check if k3s is already installed
+          command: k3s --version
+          register: current_k3s_version
+          changed_when: false
+      rescue:
+        - name: Install k3s
+          become: true # removing --node-ip {{ ansible_default_ipv6.address }}, because I shouldn't need to for IPv6 single stack.
+          # removing --flannel-ipv6-masq={{ flannel_ipv6_masq }} because it had no effect.
+          shell: curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server --cluster-init --cluster-cidr={{ cluster_cidr }} --service-cidr={{ service_cidr }} --flannel-backend={{ flannel_backend }}" sh -s -
+          register: k3s_install_output
+
+        - name: Print k3s install output
+          debug:
+            msg: "{{ k3s_install_output.stdout_lines }}"
+
+    - name: Check that k3s was installed
+      command: k3s --version
+      register: k3s_status
+      changed_when: false
+
+    - name: Print k3s status
+      debug:
+        msg: "{{ k3s_status.stdout_lines }}"
+    
+    - name: Fetch k3s config file to local workspace
+      become: true
+      fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "{{ playbook_dir }}/../.kube/k3s.yaml" # relative to ansible/ directory
+        flat: yes
+
+    - name: Prompt user to edit kubeconfig file
+      debug:
+        msg: "Edit the kubeconfig file at {{ playbook_dir }}/../.kube/k3s.yaml to replace the server address with the public IPv6 address of the VPS: {{ ansible_default_ipv6.address }}"

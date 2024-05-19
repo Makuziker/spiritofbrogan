@@ -1,0 +1,35 @@
+---
+- name: Configure firewalld
+  hosts: hostbrr_devops
+  become: true
+  tasks:
+    - name: Install firewalld
+      dnf:
+        name: firewalld
+        state: present
+
+    - name: Enable and start firewalld service
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Check if firewalld is running
+      command: firewall-cmd --state
+      register: firewalld_state
+
+    - debug:
+        var: firewalld_state.stdout_lines
+
+    - name: Open port 22, 80, 443, and 6443
+      command: firewall-cmd --add-port=22/tcp --add-port=80/tcp --add-port=443/tcp --add-port=6443/tcp --permanent
+
+    - name: Reload firewalld
+      command: firewall-cmd --reload
+
+    - name: Check the open ports
+      command: firewall-cmd --list-ports
+      register: result
+
+    - debug:
+        var: result.stdout_lines

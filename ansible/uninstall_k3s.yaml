@@ -1,0 +1,14 @@
+---
+- name: Uninstall k3s
+  hosts: hostbrr_devops
+  become: true
+  tasks:
+    - name: Stop k3s service
+      systemd:
+        name: k3s
+        state: stopped
+        enabled: no
+
+    - name: Uninstall k3s
+      command: /usr/local/bin/k3s-uninstall.sh
+

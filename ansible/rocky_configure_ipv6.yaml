@@ -1,0 +1,71 @@
+---
+- name: Configure IPv6 VPS for Rocky
+  hosts: hostbrr_devops
+  vars:
+    nameservers:
+      - "nameserver 2a00:1098:2b::1"
+      - "nameserver 2a00:1098:2c::1"
+      - "nameserver 2a01:4f8:c2c:123f::1"
+  tasks:
+    - name: Print ansible_distribution
+      debug:
+        var: ansible_distribution
+
+    - name: Ensure ansible_distribution is Rocky
+      assert:
+        that:
+          - ansible_distribution == 'Rocky'
+
+    - name: Remove existing nameserver entries for NAT64
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/resolv.conf
+        line: "{{ item }}"
+        state: absent
+      loop: "{{ nameservers }}"
+
+    - name: Prepend nameservers to /etc/resolv.conf for NAT64
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/resolv.conf
+        line: "{{ item }}"
+        insertbefore: BOF
+      loop: "{{ nameservers }}"
+
+    - name: Update DNF packages
+      become: true
+      dnf:
+        name: '*'
+        state: latest
+
+    - name: Install basic DNF packages
+      become: true
+      dnf:
+        name:
+          - bind-utils # dig, nslookup, host, etc.
+          - vim
+          - nano
+          - curl
+        state: present
+
+    - name: Send request to IPv4 address
+      uri:
+        url: https://github.com
+        method: GET
+      register: ipv4_response
+
+    - name: Verify successful IPv4 response
+      assert:
+        that:
+          - ipv4_response.status == 200
+
+    - name: Setup sysctl parameters for IPv6
+      become: true
+      ansible.builtin.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { name: 'net.ipv6.conf.all.forwarding', value: 1 }
+        - { name: 'net.bridge.bridge-nf-call-ip6tables', value: 1 }
